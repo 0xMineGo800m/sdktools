@@ -4,6 +4,7 @@ import androidx.compose.ui.awt.ComposeWindow
 import androidx.compose.ui.window.ApplicationScope
 import feature_graph.domain.ChartLogic
 import feature_graph.domain.DataRepository
+import feature_graph.presentation.graph_screen.ChartEvent
 import javax.swing.JFileChooser
 
 /**
@@ -18,7 +19,7 @@ class MenuBarActions(private val applicationScope: ApplicationScope) {
         when (f.showOpenDialog(parent)) {
             JFileChooser.APPROVE_OPTION -> {
                 DataRepository.recordingFile = f.selectedFile
-                ChartLogic.isFileLoaded = true
+                ChartLogic.onEvent(ChartEvent.OnFileLoaded)
             }
         }
     }

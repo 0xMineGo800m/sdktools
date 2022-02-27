@@ -5,6 +5,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.google.gson.Gson
 import feature_graph.data.TimeAxisEntity
+import feature_graph.presentation.graph_screen.ChartEvent
+import feature_graph.presentation.graph_screen.ChartState
 import kotlinx.coroutines.*
 import org.jfree.data.time.Millisecond
 import org.jfree.data.time.TimeSeries
@@ -25,9 +27,48 @@ object ChartLogic {
     val axisX1Series by mutableStateOf(TimeSeries("Accel X1"))
     val axisY1Series by mutableStateOf(TimeSeries("Accel Y1"))
     val axisZ1Series by mutableStateOf(TimeSeries("Accel Z1"))
-    var isFileLoaded by mutableStateOf(false)
 
-    fun playRecordingFile() {
+    var graphState by mutableStateOf(ChartState())
+
+    fun onEvent(event: ChartEvent) {
+        when (event) {
+            is ChartEvent.AxisVisibility -> {
+                handleAxisVisibility(event)
+            }
+
+            is ChartEvent.OnFileLoaded -> {
+                handleOnFileLoaded()
+            }
+
+            is ChartEvent.PlayRecordingFile -> {
+                playRecordingFile()
+            }
+
+            is ChartEvent.StopRecordingFile -> {
+                stopRecordingFile()
+            }
+        }
+    }
+
+    private fun handleOnFileLoaded() {
+        graphState = graphState.copy(isFileLoaded = true)
+    }
+
+    private fun handleAxisVisibility(event: ChartEvent.AxisVisibility) {
+        when (event.axisName) {
+            "AxisX1" -> {
+                graphState = graphState.copy(axisX1Visible = event.isVisible)
+            }
+            "AxisY1" -> {
+                graphState = graphState.copy(axisY1Visible = event.isVisible)
+            }
+            "AxisZ1" -> {
+                graphState = graphState.copy(axisZ1Visible = event.isVisible)
+            }
+        }
+    }
+
+    private fun playRecordingFile() {
 
         if (isUpdateActive) return
         isUpdateActive = true
@@ -54,11 +95,11 @@ object ChartLogic {
         }
     }
 
-    fun stop() {
+    private fun stopRecordingFile() {
         isUpdateActive = false
         coroutineScope.cancel()
         coroutineScope = CoroutineScope(Dispatchers.Main)
         currentPlayingFile = null
-        isFileLoaded = false
+        graphState = graphState.copy(isFileLoaded = false)
     }
 }

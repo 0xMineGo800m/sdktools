@@ -4,7 +4,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import feature_graph.domain.ChartLogic
-import feature_graph.presentation.graph_screen.GraphScreen
+import feature_graph.presentation.graph_screen.ChartScreen
 import menubar_feature.domain.MenuBarActions
 import menubar_feature.presentation.WindowMenuBar
 
@@ -21,7 +21,7 @@ fun main() = application {
 
         MaterialTheme {
             WindowMenuBar(menuBarActions)
-            GraphScreen(chartLogic)
+            ChartScreen(chartLogic)
         }
     }
 }

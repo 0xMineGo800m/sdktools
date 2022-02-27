@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -31,14 +30,14 @@ import javax.swing.JPanel
 typealias AxisVisibility = (isChecked: Boolean) -> Unit
 
 @Composable
-fun GraphScreen(chartLogic: ChartLogic) {
+fun ChartScreen(chartLogic: ChartLogic) {
     Column {
         Row(modifier = Modifier.padding(5.dp), Arrangement.spacedBy(5.dp)) {
-            Button(onClick = { chartLogic.playRecordingFile() }, enabled = chartLogic.isFileLoaded) {
+            Button(onClick = { chartLogic.onEvent(ChartEvent.PlayRecordingFile) }, enabled = chartLogic.graphState.isFileLoaded) {
                 Text("Play recording")
             }
 
-            Button(onClick = { chartLogic.stop() }, enabled = chartLogic.isUpdateActive) {
+            Button(onClick = { chartLogic.onEvent(ChartEvent.StopRecordingFile) }, enabled = chartLogic.isUpdateActive) {
                 Text("Stop recording")
             }
         }
@@ -46,19 +45,15 @@ fun GraphScreen(chartLogic: ChartLogic) {
         Spacer(Modifier.height(10.dp))
 
         Row(modifier = Modifier.padding(5.dp), Arrangement.spacedBy(5.dp)) {
-            val axisXVisible = remember { mutableStateOf(true) }
-            val axisYVisible = remember { mutableStateOf(true) }
-            val axisZVisible = remember { mutableStateOf(true) }
-
-            val axisVisibilities = ArrayList<MutableState<Boolean>>()
-            axisVisibilities.add(axisXVisible)
-            axisVisibilities.add(axisYVisible)
-            axisVisibilities.add(axisZVisible)
+            val axisVisibilities = ArrayList<Boolean>()
+            axisVisibilities.add(chartLogic.graphState.axisX1Visible)
+            axisVisibilities.add(chartLogic.graphState.axisY1Visible)
+            axisVisibilities.add(chartLogic.graphState.axisZ1Visible)
 
             AxisSelector(
-                { isChecked -> axisXVisible.value = isChecked },
-                { isChecked -> axisYVisible.value = isChecked },
-                { isChecked -> axisZVisible.value = isChecked }
+                { isChecked -> chartLogic.onEvent(ChartEvent.AxisVisibility("AxisX1", isChecked)) },
+                { isChecked -> chartLogic.onEvent(ChartEvent.AxisVisibility("AxisY1", isChecked)) },
+                { isChecked -> chartLogic.onEvent(ChartEvent.AxisVisibility("AxisZ1", isChecked)) }
             )
 
             val axis = ArrayList<TimeSeries>()
@@ -75,15 +70,15 @@ fun GraphScreen(chartLogic: ChartLogic) {
 private fun AxisSelector(axisX1Action: AxisVisibility, axisY1Action: AxisVisibility, axisZ1Action: AxisVisibility) {
     Card(elevation = 5.dp, shape = RoundedCornerShape(0.dp)) {
         Column(modifier = Modifier.padding(8.dp).wrapContentWidth().fillMaxHeight()) {
-            LabelledCheckbox("x Axis", true) { axisX1Action.invoke(it) }
-            LabelledCheckbox("y Axis", true) { axisY1Action.invoke(it) }
-            LabelledCheckbox("z Axis", true) { axisZ1Action.invoke(it) }
-            LabelledCheckbox("x1 Axis") {}
-            LabelledCheckbox("y1 Axis") {}
-            LabelledCheckbox("z1 Axis") {}
+            LabelledCheckbox("x1 Axis", true) { axisX1Action.invoke(it) }
+            LabelledCheckbox("y1 Axis", true) { axisY1Action.invoke(it) }
+            LabelledCheckbox("z1 Axis", true) { axisZ1Action.invoke(it) }
             LabelledCheckbox("x2 Axis") {}
             LabelledCheckbox("y2 Axis") {}
             LabelledCheckbox("z2 Axis") {}
+            LabelledCheckbox("x3 Axis") {}
+            LabelledCheckbox("y3 Axis") {}
+            LabelledCheckbox("z3 Axis") {}
         }
     }
 }
@@ -106,7 +101,7 @@ fun LabelledCheckbox(label: String, initCheckedState: Boolean = false, action: (
 }
 
 @Composable
-fun TheChart(axisVisibilities: List<MutableState<Boolean>>, axis: List<TimeSeries>) {
+fun TheChart(axisVisibilities: List<Boolean>, axis: List<TimeSeries>) {
     Card(elevation = 5.dp, shape = RoundedCornerShape(0.dp), modifier = Modifier.fillMaxSize()) {
 
         val dataset = TimeSeriesCollection()
@@ -116,12 +111,9 @@ fun TheChart(axisVisibilities: List<MutableState<Boolean>>, axis: List<TimeSerie
         }
 
         val renderer = XYSplineRenderer()
-        for (i in 0..axis.size) {
-            renderer.setSeriesShapesVisible(i, false)
-        }
-
-        axisVisibilities.forEachIndexed { index, mutableState ->
-            renderer.setSeriesVisible(index, mutableState.value)
+        axisVisibilities.forEachIndexed { index, isVisible ->
+            renderer.setSeriesShapesVisible(index, false)
+            renderer.setSeriesVisible(index, isVisible)
         }
 
         val xAxis = DateAxis("Time")
@@ -131,7 +123,6 @@ fun TheChart(axisVisibilities: List<MutableState<Boolean>>, axis: List<TimeSerie
         val chart = JFreeChart("Plotter", JFreeChart.DEFAULT_TITLE_FONT, plot, true)
         chart.xyPlot.isDomainPannable = true
         chart.xyPlot.isRangePannable = true
-
         val frame = ChartPanel(chart)
         frame.isVisible = true
 
