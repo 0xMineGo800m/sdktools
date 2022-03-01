@@ -5,7 +5,7 @@ import java.io.File
 /**
  * Created by Alon Minski on 26/02/2022.
  */
-object DataRepository {
+class DataRepository {
 
     var recordingFile: File? = null
 }

@@ -18,7 +18,7 @@ import java.util.*
  * Created by Alon Minski on 18/02/2022.
  */
 @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
-object ChartLogic {
+class ChartLogic(private val dataRepository: DataRepository) {
 
     private val gson = Gson()
     private var coroutineScope = CoroutineScope(Dispatchers.IO)
@@ -73,7 +73,7 @@ object ChartLogic {
         if (isUpdateActive) return
         isUpdateActive = true
 
-        currentPlayingFile = DataRepository.recordingFile
+        currentPlayingFile = dataRepository.recordingFile
         if (currentPlayingFile == null) return
 
         val fis = FileInputStream(currentPlayingFile)
