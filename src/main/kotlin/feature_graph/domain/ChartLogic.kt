@@ -47,10 +47,24 @@ class ChartLogic(private val dataRepository: DataRepository) {
             is ChartEvent.StopRecordingFile -> {
                 stopRecordingFile()
             }
+
+            is ChartEvent.OnSocketGotData -> {
+                handleSocketData(event.socketDataLine)
+            }
         }
     }
 
+    private fun handleSocketData(socketDataLine: String) {
+        val data = gson.fromJson(socketDataLine, TimeAxisEntity::class.java)
+        axisX1Series.add(Millisecond(), data.accelX)
+        axisY1Series.add(Millisecond(), data.accelY)
+        axisZ1Series.add(Millisecond(), data.accelZ)
+    }
+
     private fun handleOnFileLoaded() {
+        axisX1Series.clear()
+        axisY1Series.clear()
+        axisZ1Series.clear()
         graphState = graphState.copy(isFileLoaded = true)
     }
 

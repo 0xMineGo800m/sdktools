@@ -10,6 +10,7 @@ import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
 import io.ktor.utils.io.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers.IO
 import java.net.InetSocketAddress
 import java.nio.file.Path
 
@@ -34,9 +35,9 @@ class MenuBarActions(private val dataRepository: DataRepository, private val cha
     }
 
     fun connectToPort() {
-        runBlocking {
+        CoroutineScope(IO).launch {
 
-            val server = aSocket(ActorSelectorManager(Dispatchers.IO)).tcp().bind(InetSocketAddress("127.0.0.1", 1337))
+            val server = aSocket(ActorSelectorManager(IO)).tcp().bind(InetSocketAddress("127.0.0.1", 1337))
             println("[+] Started server ${server.localAddress}")
 
             while (true) {
@@ -55,7 +56,9 @@ class MenuBarActions(private val dataRepository: DataRepository, private val cha
                                     cancel()
                                     return@loop
                                 }
-                                println("$line")
+
+                                chartLogic.onEvent(ChartEvent.OnSocketGotData(line))
+                                println("[+] Input from socket: $line")
                             }
                         }
 
