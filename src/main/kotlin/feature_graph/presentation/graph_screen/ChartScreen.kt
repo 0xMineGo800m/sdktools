@@ -111,7 +111,9 @@ fun TheChart(axisVisibilities: List<Boolean>, axis: List<TimeSeries>) {
         }
 
         val renderer = XYSplineRenderer()
+
         axisVisibilities.forEachIndexed { index, isVisible ->
+            renderer.setSeriesPaint(index, ui.theme.colorMap[index])
             renderer.setSeriesShapesVisible(index, false)
             renderer.setSeriesVisible(index, isVisible)
         }

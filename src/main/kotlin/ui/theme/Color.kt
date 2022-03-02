@@ -20,3 +20,15 @@ val RedPink = Color(0xfff48fb1)
 val BabyBlue = Color(0xff81deea)
 val Violet = Color(0xffcf94da)
 val LightGreen = Color(0xffe7ed9b)
+
+val colorMap: HashMap<Int, java.awt.Color> = generateAWTColorMap()
+
+fun generateAWTColorMap(): java.util.HashMap<Int, java.awt.Color> {
+    return HashMap<Int, java.awt.Color>().apply {
+        this[0] = java.awt.Color.BLUE
+        this[1] = java.awt.Color.RED
+        this[2] = java.awt.Color.GREEN
+        this[3] = java.awt.Color.YELLOW
+        this[4] = java.awt.Color.CYAN
+    }
+}
