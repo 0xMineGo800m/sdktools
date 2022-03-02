@@ -21,6 +21,7 @@ dependencies {
     implementation(compose.desktop.currentOs)
     implementation("org.jfree:jfreechart:1.5.3")
     implementation("com.google.code.gson:gson:2.9.0")
+    implementation("io.ktor:ktor-network:1.6.7")
 }
 
 tasks.test {
