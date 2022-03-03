@@ -8,6 +8,9 @@ import feature_graph.data.TimeAxisEntity
 import feature_graph.presentation.graph_screen.ChartEvent
 import feature_graph.presentation.graph_screen.ChartState
 import kotlinx.coroutines.*
+import org.jfree.chart.event.ChartChangeEventType
+import org.jfree.chart.plot.XYPlot
+import org.jfree.data.Range
 import org.jfree.data.time.Millisecond
 import org.jfree.data.time.TimeSeries
 import java.io.File
@@ -23,7 +26,8 @@ class ChartLogic(private val dataRepository: DataRepository) {
     private val gson = Gson()
     private var coroutineScope = CoroutineScope(Dispatchers.IO)
     private var currentPlayingFile: File? = null
-    var isUpdateActive by mutableStateOf(false)
+    var isFileReadingActive by mutableStateOf(false)
+    var isSocketReadingActive by mutableStateOf(false)
     val axisX1Series by mutableStateOf(TimeSeries("Accel X1"))
     val axisY1Series by mutableStateOf(TimeSeries("Accel Y1"))
     val axisZ1Series by mutableStateOf(TimeSeries("Accel Z1"))
@@ -51,10 +55,26 @@ class ChartLogic(private val dataRepository: DataRepository) {
             is ChartEvent.OnSocketGotData -> {
                 handleSocketData(event.socketDataLine)
             }
+
+            is ChartEvent.ResetChartYRange -> {
+                handleResetChartYRange()
+            }
+            is ChartEvent.OnChartPlotChangeEvent -> {
+                if (event.event.type.equals(ChartChangeEventType.GENERAL)){
+                    val range = (event.event.plot as XYPlot).rangeAxis.range
+                    graphState.yAxisRange = Range(range.lowerBound, range.upperBound)
+                }
+            }
         }
     }
 
+    private fun handleResetChartYRange() {
+        graphState = graphState.copy(yAxisRange = Range(-10.1, 10.1))
+    }
+
     private fun handleSocketData(socketDataLine: String) {
+        isFileReadingActive = false
+        isSocketReadingActive = true
         val data = gson.fromJson(socketDataLine, TimeAxisEntity::class.java)
         axisX1Series.add(Millisecond(), data.accelX)
         axisY1Series.add(Millisecond(), data.accelY)
@@ -84,8 +104,8 @@ class ChartLogic(private val dataRepository: DataRepository) {
 
     private fun playRecordingFile() {
 
-        if (isUpdateActive) return
-        isUpdateActive = true
+        if (isFileReadingActive) return
+        isFileReadingActive = true
 
         currentPlayingFile = dataRepository.recordingFile
         if (currentPlayingFile == null) return
@@ -95,7 +115,7 @@ class ChartLogic(private val dataRepository: DataRepository) {
 
         coroutineScope.launch {
 
-            while (scanner.hasNextLine() && isUpdateActive) {
+            while (scanner.hasNextLine() && isFileReadingActive) {
                 val line = scanner.nextLine()
                 val data = gson.fromJson(line, TimeAxisEntity::class.java)
                 println(data)
@@ -105,12 +125,12 @@ class ChartLogic(private val dataRepository: DataRepository) {
                 delay(40)
             }
 
-            isUpdateActive = false
+            isFileReadingActive = false
         }
     }
 
     private fun stopRecordingFile() {
-        isUpdateActive = false
+        isFileReadingActive = false
         coroutineScope.cancel()
         coroutineScope = CoroutineScope(Dispatchers.Main)
         currentPlayingFile = null

@@ -15,9 +15,9 @@ import org.jfree.chart.ChartPanel
 import org.jfree.chart.JFreeChart
 import org.jfree.chart.axis.DateAxis
 import org.jfree.chart.axis.NumberAxis
+import org.jfree.chart.event.PlotChangeEvent
 import org.jfree.chart.plot.XYPlot
 import org.jfree.chart.renderer.xy.XYSplineRenderer
-import org.jfree.data.Range
 import org.jfree.data.time.TimeSeries
 import org.jfree.data.time.TimeSeriesCollection
 import javax.swing.BoxLayout
@@ -37,8 +37,12 @@ fun ChartScreen(chartLogic: ChartLogic) {
                 Text("Play recording")
             }
 
-            Button(onClick = { chartLogic.onEvent(ChartEvent.StopRecordingFile) }, enabled = chartLogic.isUpdateActive) {
-                Text("Stop recording")
+            Button(onClick = { chartLogic.onEvent(ChartEvent.StopRecordingFile) }, enabled = chartLogic.isFileReadingActive) {
+                Text("Stop playing")
+            }
+
+            Button(onClick = { chartLogic.onEvent(ChartEvent.ResetChartYRange) }, enabled = chartLogic.isSocketReadingActive || chartLogic.isFileReadingActive) {
+                Text("Reset chart y range")
             }
         }
 
@@ -61,7 +65,7 @@ fun ChartScreen(chartLogic: ChartLogic) {
             axis.add(chartLogic.axisY1Series)
             axis.add(chartLogic.axisZ1Series)
 
-            TheChart(axisVisibilities, axis)
+            TheChart(axisVisibilities, axis, chartLogic)
         }
     }
 }
@@ -101,7 +105,7 @@ fun LabelledCheckbox(label: String, initCheckedState: Boolean = false, action: (
 }
 
 @Composable
-fun TheChart(axisVisibilities: List<Boolean>, axis: List<TimeSeries>) {
+fun TheChart(axisVisibilities: List<Boolean>, axis: List<TimeSeries>, chartLogic: ChartLogic) {
     Card(elevation = 5.dp, shape = RoundedCornerShape(0.dp), modifier = Modifier.fillMaxSize()) {
 
         val dataset = TimeSeriesCollection()
@@ -120,11 +124,12 @@ fun TheChart(axisVisibilities: List<Boolean>, axis: List<TimeSeries>) {
 
         val xAxis = DateAxis("Time")
         val yAxis = NumberAxis("Value")
-        yAxis.range = Range(-10.0, 10.0)
         val plot = XYPlot(dataset, xAxis, yAxis, renderer)
         val chart = JFreeChart("Plotter", JFreeChart.DEFAULT_TITLE_FONT, plot, true)
         chart.xyPlot.isDomainPannable = true
         chart.xyPlot.isRangePannable = true
+        chart.xyPlot.rangeAxis.range = chartLogic.graphState.yAxisRange
+        chart.xyPlot.addChangeListener { event -> chartLogic.onEvent(ChartEvent.OnChartPlotChangeEvent(event)) }
         val frame = ChartPanel(chart)
         frame.isVisible = true
 
