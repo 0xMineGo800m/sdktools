@@ -60,11 +60,16 @@ class ChartLogic(private val dataRepository: DataRepository) {
                 handleResetChartYRange()
             }
             is ChartEvent.OnChartPlotChangeEvent -> {
-                if (event.event.type.equals(ChartChangeEventType.GENERAL)){
-                    val range = (event.event.plot as XYPlot).rangeAxis.range
-                    graphState.yAxisRange = Range(range.lowerBound, range.upperBound)
-                }
+                // Updating the yRange value in the ChartState object in order for the "Reset y range" button to function.
+                handleOnChartPlotChanged(event)
             }
+        }
+    }
+
+    private fun handleOnChartPlotChanged(event: ChartEvent.OnChartPlotChangeEvent) {
+        if (event.event.type.equals(ChartChangeEventType.GENERAL)) {
+            val range = (event.event.plot as XYPlot).rangeAxis.range
+            graphState.yAxisRange = Range(range.lowerBound, range.upperBound)
         }
     }
 

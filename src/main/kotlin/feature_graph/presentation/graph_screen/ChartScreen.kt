@@ -49,16 +49,21 @@ fun ChartScreen(chartLogic: ChartLogic) {
 
         Row(modifier = Modifier.padding(5.dp), Arrangement.spacedBy(5.dp)) {
             val axisVisibilities = ArrayList<Boolean>()
+
+            // Observing which AXIS is visible states...
             axisVisibilities.add(chartLogic.graphState.axisX1Visible)
             axisVisibilities.add(chartLogic.graphState.axisY1Visible)
             axisVisibilities.add(chartLogic.graphState.axisZ1Visible)
 
+            // When changing check boxes, will inform ChartLogic of the UI change
             AxisSelector(
                 { isChecked -> chartLogic.onEvent(ChartEvent.AxisVisibility("AxisX1", isChecked)) },
                 { isChecked -> chartLogic.onEvent(ChartEvent.AxisVisibility("AxisY1", isChecked)) },
                 { isChecked -> chartLogic.onEvent(ChartEvent.AxisVisibility("AxisZ1", isChecked)) }
             )
 
+
+            // Adding the 3 axis data sets to the JFreeChart object...
             val axis = ArrayList<TimeSeries>()
             axis.add(chartLogic.axisX1Series)
             axis.add(chartLogic.axisY1Series)
@@ -103,6 +108,9 @@ fun LabelledCheckbox(label: String, initCheckedState: Boolean = false, action: (
     }
 }
 
+/**
+ * Using a JFreeChart object to render graphs. This is an old library and is written in Java Swing. Using a SwingPanel I can add it to the Compose tree.
+ */
 @Composable
 fun TheChart(axisVisibilities: List<Boolean>, axis: List<TimeSeries>, chartLogic: ChartLogic) {
     Card(elevation = 5.dp, shape = RoundedCornerShape(0.dp), modifier = Modifier.fillMaxSize()) {
@@ -129,7 +137,7 @@ fun TheChart(axisVisibilities: List<Boolean>, axis: List<TimeSeries>, chartLogic
         chart.xyPlot.isRangePannable = true
         chart.xyPlot.rangeAxis.range = chartLogic.graphState.yAxisRange
         chart.xyPlot.addChangeListener { event -> chartLogic.onEvent(ChartEvent.OnChartPlotChangeEvent(event)) }
-        val frame = ChartPanel(chart)
+        val frame = ChartPanel(chart) // <-- This call is a bit frightening. If this gets called each recomposition... isn't that a performance hit?? Do I need to use LaunchedEffect here?
         frame.isVisible = true
 
         Box {

@@ -23,14 +23,19 @@ class MenuBarActions(private val dataRepository: DataRepository, private val cha
     var shouldCloseApp by mutableStateOf(false)
 
     suspend fun openFile() {
-        val pathToFile = openDialog.awaitResult()
+
+        // Calling awaitResult will create a new onResult variable which means isAwaiting gets updates to true. UI observes this change and will recompose... magic
+        val pathToFile = openDialog.awaitResult() // <-- this will wait for a result. Result will arrive from UI interaction
         if (pathToFile != null) {
+
+            // We have a result lets grab the file and inform ChartLogic
             dataRepository.recordingFile = pathToFile.toFile()
             chartLogic.onEvent(ChartEvent.OnFileLoaded)
         }
     }
 
     fun exitApplication() {
+        // This is observed in UI
         shouldCloseApp = true
     }
 
@@ -63,7 +68,7 @@ class MenuBarActions(private val dataRepository: DataRepository, private val cha
                         }
 
                         println("[+] Terminating socket...")
-                        socket.close()
+                        socket.close() // <-- is this a lint bug?
 
                     } catch (e: Throwable) {
                         e.printStackTrace()
@@ -77,9 +82,12 @@ class MenuBarActions(private val dataRepository: DataRepository, private val cha
 class DialogState<T> {
     private var onResult: CompletableDeferred<T>? by mutableStateOf(null)
 
+    // This is observed by UI...
     val isAwaiting get() = onResult != null
 
     suspend fun awaitResult(): T {
+
+        // Creating a new onResult. This will recompose ui somehow. Not sure why exactly...
         onResult = CompletableDeferred()
         val result = onResult!!.await()
         onResult = null
