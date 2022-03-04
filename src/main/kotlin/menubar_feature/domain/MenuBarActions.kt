@@ -79,7 +79,9 @@ class MenuBarActions(private val dataRepository: DataRepository, private val cha
     }
 }
 
+// Taken from official Notepad application example
 class DialogState<T> {
+
     private var onResult: CompletableDeferred<T>? by mutableStateOf(null)
 
     // This is observed by UI...

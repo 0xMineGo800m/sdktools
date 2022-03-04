@@ -41,3 +41,6 @@ The app main function starts and then 3 action occur:
 - Is the seperation of ChartScreen (UI) and ChartLogic (Busines logic) and ChartState (State) and DataRepository done correctly?
 - Do I use 'remember', 'mutableStateOf' where needed and in a correct fashion?
 - The chart rendering is done using a Java Swing componenet called JFreeChart. I am concerened this object is recreated every recompose (when data is changed and needs to be rendered). Do I need to use LaunchedEffect to resolve an issue here?
+
+# Miscl
+- There is an output.txt file in /assets folder that one can load if needed
