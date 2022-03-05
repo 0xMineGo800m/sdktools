@@ -24,30 +24,25 @@ fun FrameWindowScope.WindowMenuBar(actions: MenuBarActions) = MenuBar {
     val scope = rememberCoroutineScope()
 
     fun openFile() = scope.launch { actions.openFile() }
+    fun connectToPort() = scope.launch { actions.connectToPort()}
+    fun exit() = scope.launch { actions.exitApplication() }
 
     Menu("File") {
         Item("Open recording...", onClick = { openFile() }, shortcut = KeyShortcut(Key.O, meta = true))
         Item("Save", onClick = { }, shortcut = KeyShortcut(Key.S, meta = true))
         Separator()
-        Item("Exit", onClick = { actions.exitApplication() }, shortcut = KeyShortcut(Key.Q, meta = true))
+        Item("Exit", onClick = { exit() }, shortcut = KeyShortcut(Key.Q, meta = true))
     }
 
     Menu("Actions") {
-        Item("Connect to port", onClick = { actions.connectToPort() })
+        Item("Connect to port", onClick = { connectToPort()})
         Item("Export", onClick = { })
     }
 
-    // In Compose the UI dialog is already written and is basically "present".
-    // It is wrapped in a state that when triggered, allows the actual display of the UI element on recomposition
-    // *************************************************************************************************
-    // *********** For mock data, there is an output.txt file one can load in /assets folder ***********
-    // *************************************************************************************************
     if (actions.openDialog.isAwaiting) {
         FileDialog(
             title = "Load file",
             isLoad = true,
-
-            // When File Dialog result is obtained, pass it to MenuBarActions
             onResult = { actions.openDialog.onResult(it) }
         )
     }

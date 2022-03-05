@@ -6,20 +6,21 @@ import androidx.compose.runtime.setValue
 import com.google.gson.Gson
 import feature_graph.data.TimeAxisEntity
 import feature_graph.presentation.graph_screen.ChartEvent
-import feature_graph.presentation.graph_screen.ChartState
 import kotlinx.coroutines.*
-import org.jfree.chart.event.ChartChangeEventType
+import org.jfree.chart.ChartPanel
+import org.jfree.chart.JFreeChart
+import org.jfree.chart.axis.DateAxis
+import org.jfree.chart.axis.NumberAxis
 import org.jfree.chart.plot.XYPlot
+import org.jfree.chart.renderer.xy.XYSplineRenderer
 import org.jfree.data.Range
 import org.jfree.data.time.Millisecond
 import org.jfree.data.time.TimeSeries
+import org.jfree.data.time.TimeSeriesCollection
 import java.io.File
 import java.io.FileInputStream
 import java.util.*
 
-// FEEDBACK:
-// Personally, I'm not a fan of the name ChartLogic. I'd use something like
-// ChartController or ChartManager, but that's of course fully up to you :)
 /**
  * Created by Alon Minski on 18/02/2022.
  */
@@ -28,14 +29,18 @@ class ChartLogic(private val dataRepository: DataRepository) {
 
     private val gson = Gson()
     private var coroutineScope = CoroutineScope(Dispatchers.IO)
+    private val axisX1Series = TimeSeries("Accel X1")
+    private val axisY1Series = TimeSeries("Accel Y1")
+    private val axisZ1Series = TimeSeries("Accel Z1")
+    private var jFreeChart: JFreeChart? = null
     private var currentPlayingFile: File? = null
+    var axisX1Visibility by mutableStateOf(true)
+    var axisY1Visibility by mutableStateOf(true)
+    var axisZ1Visibility by mutableStateOf(true)
+    var isFileLoaded by mutableStateOf(false)
     var isFileReadingActive by mutableStateOf(false)
     var isSocketReadingActive by mutableStateOf(false)
-    val axisX1Series by mutableStateOf(TimeSeries("Accel X1"))
-    val axisY1Series by mutableStateOf(TimeSeries("Accel Y1"))
-    val axisZ1Series by mutableStateOf(TimeSeries("Accel Z1"))
-
-    var graphState by mutableStateOf(ChartState())
+    val chart by mutableStateOf(createChart())
 
     fun onEvent(event: ChartEvent) {
         when (event) {
@@ -62,22 +67,11 @@ class ChartLogic(private val dataRepository: DataRepository) {
             is ChartEvent.ResetChartYRange -> {
                 handleResetChartYRange()
             }
-            is ChartEvent.OnChartPlotChangeEvent -> {
-                // Updating the yRange value in the ChartState object in order for the "Reset y range" button to function.
-                handleOnChartPlotChanged(event)
-            }
-        }
-    }
-
-    private fun handleOnChartPlotChanged(event: ChartEvent.OnChartPlotChangeEvent) {
-        if (event.event.type.equals(ChartChangeEventType.GENERAL)) {
-            val range = (event.event.plot as XYPlot).rangeAxis.range
-            graphState.yAxisRange = Range(range.lowerBound, range.upperBound)
         }
     }
 
     private fun handleResetChartYRange() {
-        graphState = graphState.copy(yAxisRange = Range(-10.1, 10.1))
+        jFreeChart?.xyPlot?.rangeAxis?.range = Range(-10.0, 10.0)
     }
 
     private fun handleSocketData(socketDataLine: String) {
@@ -106,23 +100,25 @@ class ChartLogic(private val dataRepository: DataRepository) {
         // axisX1Series = emptyList()
 
         // Recomposes are only triggered if you assign a new value to a compose state.
-
         axisX1Series.clear()
         axisY1Series.clear()
         axisZ1Series.clear()
-        graphState = graphState.copy(isFileLoaded = true)
+        isFileLoaded = true
     }
 
     private fun handleAxisVisibility(event: ChartEvent.AxisVisibility) {
         when (event.axisName) {
             "AxisX1" -> {
-                graphState = graphState.copy(axisX1Visible = event.isVisible)
+                jFreeChart?.xyPlot?.renderer?.setSeriesVisible(0, event.isVisible)
+                axisX1Visibility = event.isVisible
             }
             "AxisY1" -> {
-                graphState = graphState.copy(axisY1Visible = event.isVisible)
+                jFreeChart?.xyPlot?.renderer?.setSeriesVisible(1, event.isVisible)
+                axisY1Visibility = event.isVisible
             }
             "AxisZ1" -> {
-                graphState = graphState.copy(axisZ1Visible = event.isVisible)
+                jFreeChart?.xyPlot?.renderer?.setSeriesVisible(2, event.isVisible)
+                axisZ1Visibility = event.isVisible
             }
         }
     }
@@ -139,11 +135,6 @@ class ChartLogic(private val dataRepository: DataRepository) {
         val scanner = Scanner(fis)
 
         // FEEDBACK:
-        // 1. Make sure to use the IO dispatcher here :)
-        // 2. In the while loop I'd check for cancellation of the coroutine
-        // 3. Not sure why there is a 40ms delay.. When there are things like this in code
-        // where it's not directly clear why something happens, commenting on this helps a lot :)
-        // If you added the delay to make it cancellable, remove it and use ensureActive instead.
         // 4. File reading logic belongs in a separate data related class such as the repository
         coroutineScope.launch {
 
@@ -155,7 +146,6 @@ class ChartLogic(private val dataRepository: DataRepository) {
                 axisY1Series.add(Millisecond(), data.accelY)
                 axisZ1Series.add(Millisecond(), data.accelZ)
 
-                ensureActive() // <- This makes sure the coroutine can be cancelled properly
                 delay(40)
             }
 
@@ -166,8 +156,42 @@ class ChartLogic(private val dataRepository: DataRepository) {
     private fun stopRecordingFile() {
         isFileReadingActive = false
         coroutineScope.cancel()
-        coroutineScope = CoroutineScope(Dispatchers.Main)
+        coroutineScope = CoroutineScope(Dispatchers.IO)
         currentPlayingFile = null
-        graphState = graphState.copy(isFileLoaded = false)
+        isFileLoaded = false
+    }
+
+    private fun createChart(): ChartPanel {
+        val axisSeries = ArrayList<TimeSeries>()
+        axisSeries.add(axisX1Series)
+        axisSeries.add(axisY1Series)
+        axisSeries.add(axisZ1Series)
+
+        val dataset = TimeSeriesCollection()
+        axisSeries.forEach { axis ->
+            axis.maximumItemCount = 200
+            dataset.addSeries(axis)
+        }
+
+        val renderer = XYSplineRenderer()
+
+        for (index in 0..axisSeries.size){
+            renderer.setSeriesPaint(index, ui.theme.colorMap[index])
+            renderer.setSeriesShapesVisible(index, false)
+        }
+
+        val xAxis = DateAxis("Time")
+        val yAxis = NumberAxis("Value")
+        val plot = XYPlot(dataset, xAxis, yAxis, renderer)
+        jFreeChart = JFreeChart("Plotter", JFreeChart.DEFAULT_TITLE_FONT, plot, true).apply {
+            xyPlot.isDomainPannable = true
+            xyPlot.isRangePannable = true
+            xyPlot.rangeAxis.range = Range(-10.0, 10.0)
+        }
+
+        val frame = ChartPanel(jFreeChart)
+        frame.isVisible = true
+
+        return frame
     }
 }
