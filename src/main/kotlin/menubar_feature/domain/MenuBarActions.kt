@@ -39,6 +39,8 @@ class MenuBarActions(private val dataRepository: DataRepository, private val cha
         shouldCloseApp = true
     }
 
+    // FEEDBACK:
+    // This also belongs in a data related class like the repo :)
     fun connectToPort() {
         CoroutineScope(IO).launch {
 

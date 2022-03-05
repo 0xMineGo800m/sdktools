@@ -17,6 +17,9 @@ import java.io.File
 import java.io.FileInputStream
 import java.util.*
 
+// FEEDBACK:
+// Personally, I'm not a fan of the name ChartLogic. I'd use something like
+// ChartController or ChartManager, but that's of course fully up to you :)
 /**
  * Created by Alon Minski on 18/02/2022.
  */
@@ -80,6 +83,13 @@ class ChartLogic(private val dataRepository: DataRepository) {
     private fun handleSocketData(socketDataLine: String) {
         isFileReadingActive = false
         isSocketReadingActive = true
+
+        // FEEDBACK:
+        // Parsing GSON is data related logic and job of the repository.
+        // This class ideally also shouldn't know where the data is coming from
+        // (like from a DB, from sockets, etc.), but this is more advanced stuff
+        // and nothing to worry about if you're just getting started with all the
+        // architectural stuff.
         val data = gson.fromJson(socketDataLine, TimeAxisEntity::class.java)
         axisX1Series.add(Millisecond(), data.accelX)
         axisY1Series.add(Millisecond(), data.accelY)
@@ -87,6 +97,16 @@ class ChartLogic(private val dataRepository: DataRepository) {
     }
 
     private fun handleOnFileLoaded() {
+        // FEEDBACK:
+        // Clearing a list state doesn't trigger recomposes.
+        // I'd be VERY careful in general using mutable lists since these come with a lot of
+        // dangers like this one. They also very often lead to race conditions.
+        // It would be better to use immutable lists as state and then just do this to clear it:
+
+        // axisX1Series = emptyList()
+
+        // Recomposes are only triggered if you assign a new value to a compose state.
+
         axisX1Series.clear()
         axisY1Series.clear()
         axisZ1Series.clear()
@@ -118,6 +138,13 @@ class ChartLogic(private val dataRepository: DataRepository) {
         val fis = FileInputStream(currentPlayingFile)
         val scanner = Scanner(fis)
 
+        // FEEDBACK:
+        // 1. Make sure to use the IO dispatcher here :)
+        // 2. In the while loop I'd check for cancellation of the coroutine
+        // 3. Not sure why there is a 40ms delay.. When there are things like this in code
+        // where it's not directly clear why something happens, commenting on this helps a lot :)
+        // If you added the delay to make it cancellable, remove it and use ensureActive instead.
+        // 4. File reading logic belongs in a separate data related class such as the repository
         coroutineScope.launch {
 
             while (scanner.hasNextLine() && isFileReadingActive) {
@@ -127,6 +154,8 @@ class ChartLogic(private val dataRepository: DataRepository) {
                 axisX1Series.add(Millisecond(), data.accelX)
                 axisY1Series.add(Millisecond(), data.accelY)
                 axisZ1Series.add(Millisecond(), data.accelZ)
+
+                ensureActive() // <- This makes sure the coroutine can be cancelled properly
                 delay(40)
             }
 
