@@ -29,9 +29,9 @@ class ChartLogic(private val dataRepository: DataRepository) {
 
     private val gson = Gson()
     private var coroutineScope = CoroutineScope(Dispatchers.IO)
-    private val axisX1Series = TimeSeries("Accel X1")
-    private val axisY1Series = TimeSeries("Accel Y1")
-    private val axisZ1Series = TimeSeries("Accel Z1")
+    private var axisX1Series = TimeSeries("Accel X1")
+    private var axisY1Series = TimeSeries("Accel Y1")
+    private var axisZ1Series = TimeSeries("Accel Z1")
     private var jFreeChart: JFreeChart? = null
     private var currentPlayingFile: File? = null
     var axisX1Visibility by mutableStateOf(true)
@@ -40,7 +40,7 @@ class ChartLogic(private val dataRepository: DataRepository) {
     var isFileLoaded by mutableStateOf(false)
     var isFileReadingActive by mutableStateOf(false)
     var isSocketReadingActive by mutableStateOf(false)
-    val chart by mutableStateOf(createChart())
+    val chartPanel by mutableStateOf(createChart())
 
     fun onEvent(event: ChartEvent) {
         when (event) {
@@ -64,14 +64,37 @@ class ChartLogic(private val dataRepository: DataRepository) {
                 handleSocketData(event.socketDataLine)
             }
 
+            is ChartEvent.OnSocketNoData -> {
+                handleSocketNoData()
+            }
+
             is ChartEvent.ResetChartYRange -> {
                 handleResetChartYRange()
+            }
+
+            is ChartEvent.ResetChart -> {
+                handleResetChart()
             }
         }
     }
 
+    private fun handleSocketNoData() {
+        isSocketReadingActive = false
+    }
+
+    private fun handleResetChart() {
+        val timeSeriesCollection = jFreeChart?.xyPlot?.dataset as TimeSeriesCollection
+        timeSeriesCollection.removeAllSeries()
+        axisX1Series.clear()
+        axisY1Series.clear()
+        axisZ1Series.clear()
+        timeSeriesCollection.addSeries(axisX1Series)
+        timeSeriesCollection.addSeries(axisY1Series)
+        timeSeriesCollection.addSeries(axisZ1Series)
+    }
+
     private fun handleResetChartYRange() {
-        jFreeChart?.xyPlot?.rangeAxis?.range = Range(-10.0, 10.0)
+        jFreeChart?.xyPlot?.rangeAxis?.range = Range(RANGE_MIN, RANGE_MAX)
     }
 
     private fun handleSocketData(socketDataLine: String) {
@@ -91,18 +114,8 @@ class ChartLogic(private val dataRepository: DataRepository) {
     }
 
     private fun handleOnFileLoaded() {
-        // FEEDBACK:
-        // Clearing a list state doesn't trigger recomposes.
-        // I'd be VERY careful in general using mutable lists since these come with a lot of
-        // dangers like this one. They also very often lead to race conditions.
-        // It would be better to use immutable lists as state and then just do this to clear it:
-
-        // axisX1Series = emptyList()
-
-        // Recomposes are only triggered if you assign a new value to a compose state.
-        axisX1Series.clear()
-        axisY1Series.clear()
-        axisZ1Series.clear()
+        handleResetChart()
+        isSocketReadingActive = false
         isFileLoaded = true
     }
 
@@ -186,12 +199,17 @@ class ChartLogic(private val dataRepository: DataRepository) {
         jFreeChart = JFreeChart("Plotter", JFreeChart.DEFAULT_TITLE_FONT, plot, true).apply {
             xyPlot.isDomainPannable = true
             xyPlot.isRangePannable = true
-            xyPlot.rangeAxis.range = Range(-10.0, 10.0)
+            xyPlot.rangeAxis.range = Range(RANGE_MIN, RANGE_MAX)
         }
 
         val frame = ChartPanel(jFreeChart)
         frame.isVisible = true
 
         return frame
+    }
+
+    companion object {
+        private const val RANGE_MIN = -15.0
+        private const val RANGE_MAX = 15.0
     }
 }

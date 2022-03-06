@@ -25,7 +25,7 @@ fun ChartScreen(chartLogic: ChartLogic) {
         Row(modifier = Modifier.padding(5.dp), Arrangement.spacedBy(5.dp)) {
             Button(
                 onClick = { chartLogic.onEvent(ChartEvent.PlayRecordingFile) },
-                enabled = chartLogic.isFileLoaded
+                enabled = chartLogic.isFileLoaded && !(chartLogic.isSocketReadingActive && chartLogic.isFileReadingActive)
             ) {
                 Text("Play recording")
             }
@@ -43,6 +43,13 @@ fun ChartScreen(chartLogic: ChartLogic) {
             ) {
                 Text("Reset chart y range")
             }
+
+            Button(
+                onClick = { chartLogic.onEvent(ChartEvent.ResetChart) },
+                enabled = !chartLogic.isSocketReadingActive && !chartLogic.isFileReadingActive
+            ) {
+                Text("Reset graph")
+            }
         }
 
         Spacer(Modifier.height(10.dp))
@@ -58,7 +65,7 @@ fun ChartScreen(chartLogic: ChartLogic) {
                 axisZ1Action = { isChecked -> chartLogic.onEvent(ChartEvent.AxisVisibility("AxisZ1", isChecked)) }
             )
 
-            TheChart(chartLogic.chart)
+            TheChart(chartLogic.chartPanel)
         }
     }
 }

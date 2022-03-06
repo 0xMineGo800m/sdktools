@@ -21,10 +21,13 @@ import java.nio.file.Path
 class MenuBarActions(private val dataRepository: DataRepository, private val chartLogic: ChartLogic) {
     val openDialog = DialogState<Path?>()
     var shouldCloseApp by mutableStateOf(false)
+    private var server: ServerSocket? = null
+    private var connectToPortJob: Job? = null
 
     suspend fun openFile() {
         val pathToFile = openDialog.awaitResult()
         if (pathToFile != null) {
+            disconnectPort()
             dataRepository.recordingFile = pathToFile.toFile()
             chartLogic.onEvent(ChartEvent.OnFileLoaded)
         }
@@ -34,41 +37,52 @@ class MenuBarActions(private val dataRepository: DataRepository, private val cha
         shouldCloseApp = true
     }
 
+    suspend fun disconnectPort(){
+        withContext(IO) {
+            server?.close()
+            connectToPortJob?.cancel()
+        }
+    }
+
     // FEEDBACK:
     // This also belongs in a data related class like the repo :)
     suspend fun connectToPort() {
-        CoroutineScope(IO).launch {
+        connectToPortJob = CoroutineScope(IO).launch {
 
-            val server = aSocket(ActorSelectorManager(IO)).tcp().bind(InetSocketAddress("127.0.0.1", 1337))
-            println("[+] Started server ${server.localAddress}")
+            server = aSocket(ActorSelectorManager(IO)).tcp().bind(InetSocketAddress("127.0.0.1", 1337))
+            println("[+] Started server ${server?.localAddress}")
 
             while (true) {
-                val socket = server.accept()
+                val socket = server?.accept()
 
                 launch {
-                    println("[+] Socket accepted: ${socket.remoteAddress}")
+                    withContext(IO) {
+                        println("[+] Socket accepted: ${socket?.remoteAddress}")
 
-                    val input = socket.openReadChannel()
+                        socket.use {
 
-                    try {
-                        run loop@{
-                            while (isActive) {
-                                val line = input.readUTF8Line()
-                                if (line.isNullOrEmpty()) {
-                                    cancel()
-                                    return@loop
+                            val input = socket?.openReadChannel()
+
+                            try {
+                                run loop@{
+                                    while (isActive) {
+                                        val line = input?.readUTF8Line()
+                                        if (line.isNullOrEmpty()) {
+                                            chartLogic.onEvent(ChartEvent.OnSocketNoData)
+                                            cancel()
+                                            return@loop
+                                        }
+
+                                        chartLogic.onEvent(ChartEvent.OnSocketGotData(line))
+                                        println("[+] Input from socket: $line")
+                                    }
                                 }
 
-                                chartLogic.onEvent(ChartEvent.OnSocketGotData(line))
-                                println("[+] Input from socket: $line")
+                                println("[+] Terminating socket...")
+                            } catch (e: Throwable) {
+                                e.printStackTrace()
                             }
                         }
-
-                        println("[+] Terminating socket...")
-                        socket.close() // <-- is this a lint bug?
-
-                    } catch (e: Throwable) {
-                        e.printStackTrace()
                     }
                 }
             }
