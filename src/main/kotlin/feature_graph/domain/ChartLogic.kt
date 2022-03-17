@@ -1,10 +1,10 @@
 package feature_graph.domain
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import com.google.gson.Gson
+import feature_graph.data.DataLine
 import feature_graph.data.TimeAxisEntity
+import feature_graph.data.TimeAxisMeta
 import feature_graph.presentation.graph_screen.ChartEvent
 import kotlinx.coroutines.*
 import org.jfree.chart.ChartPanel
@@ -24,23 +24,21 @@ import java.util.*
 /**
  * Created by Alon Minski on 18/02/2022.
  */
+
+typealias AxisVisibility = (axisName: String, isChecked: Boolean) -> Unit
+
 @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
 class ChartLogic(private val dataRepository: DataRepository) {
 
     private val gson = Gson()
     private var coroutineScope = CoroutineScope(Dispatchers.IO)
-    private var axisX1Series = TimeSeries("Accel X1")
-    private var axisY1Series = TimeSeries("Accel Y1")
-    private var axisZ1Series = TimeSeries("Accel Z1")
     private var jFreeChart: JFreeChart? = null
     private var currentPlayingFile: File? = null
-    var axisX1Visibility by mutableStateOf(true)
-    var axisY1Visibility by mutableStateOf(true)
-    var axisZ1Visibility by mutableStateOf(true)
+    val axes = mutableStateMapOf<TimeSeries, Boolean>()
     var isFileLoaded by mutableStateOf(false)
     var isFileReadingActive by mutableStateOf(false)
     var isSocketReadingActive by mutableStateOf(false)
-    val chartPanel by mutableStateOf(createChart())
+    var chartPanel by mutableStateOf(createChart())
 
     fun onEvent(event: ChartEvent) {
         when (event) {
@@ -85,12 +83,11 @@ class ChartLogic(private val dataRepository: DataRepository) {
     private fun handleResetChart() {
         val timeSeriesCollection = jFreeChart?.xyPlot?.dataset as TimeSeriesCollection
         timeSeriesCollection.removeAllSeries()
-        axisX1Series.clear()
-        axisY1Series.clear()
-        axisZ1Series.clear()
-        timeSeriesCollection.addSeries(axisX1Series)
-        timeSeriesCollection.addSeries(axisY1Series)
-        timeSeriesCollection.addSeries(axisZ1Series)
+
+        axes.forEach { (t, _) ->
+            t.clear()
+            timeSeriesCollection.addSeries(t)
+        }
     }
 
     private fun handleResetChartYRange() {
@@ -98,6 +95,7 @@ class ChartLogic(private val dataRepository: DataRepository) {
     }
 
     private fun handleSocketData(socketDataLine: String) {
+        //TODO: fix this
         isFileReadingActive = false
         isSocketReadingActive = true
 
@@ -108,36 +106,48 @@ class ChartLogic(private val dataRepository: DataRepository) {
         // and nothing to worry about if you're just getting started with all the
         // architectural stuff.
         val data = gson.fromJson(socketDataLine, TimeAxisEntity::class.java)
-        axisX1Series.add(Millisecond(), data.accelX)
-        axisY1Series.add(Millisecond(), data.accelY)
-        axisZ1Series.add(Millisecond(), data.accelZ)
+//        axisX1Series.add(Millisecond(), data.accelX)
+//        axisY1Series.add(Millisecond(), data.accelY)
+//        axisZ1Series.add(Millisecond(), data.accelZ)
     }
 
     private fun handleOnFileLoaded() {
         handleResetChart()
+
+        if (initChartLogicAndAxes()) return
+
         isSocketReadingActive = false
         isFileLoaded = true
     }
 
+
+    private fun initChartLogicAndAxes(): Boolean {
+        currentPlayingFile = dataRepository.recordingFile
+        if (currentPlayingFile == null) return true
+
+        val fis = FileInputStream(currentPlayingFile)
+        val scanner = Scanner(fis)
+        val firstLine = scanner.nextLine()
+        val timeAxesMetaData = gson.fromJson(firstLine, TimeAxisMeta::class.java)
+        initAxisMap(timeAxesMetaData)
+//        initChart(timeAxesMetaData)
+        fis.close()
+        return false
+    }
+
     private fun handleAxisVisibility(event: ChartEvent.AxisVisibility) {
-        when (event.axisName) {
-            "AxisX1" -> {
-                jFreeChart?.xyPlot?.renderer?.setSeriesVisible(0, event.isVisible)
-                axisX1Visibility = event.isVisible
-            }
-            "AxisY1" -> {
-                jFreeChart?.xyPlot?.renderer?.setSeriesVisible(1, event.isVisible)
-                axisY1Visibility = event.isVisible
-            }
-            "AxisZ1" -> {
-                jFreeChart?.xyPlot?.renderer?.setSeriesVisible(2, event.isVisible)
-                axisZ1Visibility = event.isVisible
+        run loop@{
+            axes.keys.forEachIndexed { index, timeSeries ->
+                if (timeSeries.key.toString() == event.axisName) {
+                    jFreeChart?.xyPlot?.renderer?.setSeriesVisible(index, event.isVisible)
+//                    axes.computeIfPresent(timeSeries, event.isVisible)
+                    return@loop
+                }
             }
         }
     }
 
     private fun playRecordingFile() {
-
         if (isFileReadingActive) return
         isFileReadingActive = true
 
@@ -146,24 +156,39 @@ class ChartLogic(private val dataRepository: DataRepository) {
 
         val fis = FileInputStream(currentPlayingFile)
         val scanner = Scanner(fis)
+        scanner.nextLine()
 
         // FEEDBACK:
         // 4. File reading logic belongs in a separate data related class such as the repository
         coroutineScope.launch {
-
             while (scanner.hasNextLine() && isFileReadingActive) {
                 val line = scanner.nextLine()
-                val data = gson.fromJson(line, TimeAxisEntity::class.java)
+                val data = gson.fromJson(line, DataLine::class.java)
+                val axisValues = data.value.axes
+                val time = data.value.timestamp
                 println(data)
-                axisX1Series.add(Millisecond(), data.accelX)
-                axisY1Series.add(Millisecond(), data.accelY)
-                axisZ1Series.add(Millisecond(), data.accelZ)
+
+                val iterator = axes.iterator()
+                axisValues.forEach { doubleVal ->
+                    val timeAXis = iterator.next().key
+                    timeAXis.add(Millisecond(), doubleVal)
+                }
 
                 delay(40)
             }
 
             isFileReadingActive = false
+            fis.close()
         }
+    }
+
+    private fun initAxisMap(timeAxesMetaData: TimeAxisMeta?) {
+        axes.clear()
+        timeAxesMetaData?.names?.forEach { name ->
+            axes[TimeSeries(name)] = true
+        }
+
+        chartPanel = createChart()
     }
 
     private fun stopRecordingFile() {
@@ -174,21 +199,36 @@ class ChartLogic(private val dataRepository: DataRepository) {
         isFileLoaded = false
     }
 
-    private fun createChart(): ChartPanel {
-        val axisSeries = ArrayList<TimeSeries>()
-        axisSeries.add(axisX1Series)
-        axisSeries.add(axisY1Series)
-        axisSeries.add(axisZ1Series)
-
+    private fun initChart(timeAxesMetaData: TimeAxisMeta) {
         val dataset = TimeSeriesCollection()
-        axisSeries.forEach { axis ->
-            axis.maximumItemCount = 200
-            dataset.addSeries(axis)
+
+        timeAxesMetaData.names.forEach { axisName ->
+            val ts = TimeSeries(axisName).apply {
+                maximumItemCount = 200
+            }
+            axes[ts] = true
+            dataset.addSeries(ts)
         }
 
         val renderer = XYSplineRenderer()
+        for (index in 0..axes.size) {
+            renderer.setSeriesPaint(index, ui.theme.colorMap[index])
+            renderer.setSeriesShapesVisible(index, false)
+        }
 
-        for (index in 0..axisSeries.size){
+        jFreeChart?.xyPlot?.dataset = dataset
+        jFreeChart?.xyPlot?.renderer = renderer
+    }
+
+    private fun createChart(): ChartPanel {
+        val dataset = TimeSeriesCollection()
+        axes.forEach { (t, _) ->
+            t.maximumItemCount = 200
+            dataset.addSeries(t)
+        }
+
+        val renderer = XYSplineRenderer()
+        for (index in 0..axes.size) {
             renderer.setSeriesPaint(index, ui.theme.colorMap[index])
             renderer.setSeriesShapesVisible(index, false)
         }
