@@ -77,6 +77,7 @@ class ChartLogic(private val dataRepository: DataRepository) {
 
     private fun handleSocketNoData() {
         isSocketReadingActive = false
+        isSocketFirstLineRead = false
     }
 
     private fun handleResetChart() {
@@ -93,8 +94,9 @@ class ChartLogic(private val dataRepository: DataRepository) {
         jFreeChart?.xyPlot?.rangeAxis?.range = Range(RANGE_MIN, RANGE_MAX)
     }
 
+    private var isSocketFirstLineRead = false
+
     private fun handleSocketData(socketDataLine: String) {
-        //TODO: fix this
         isFileReadingActive = false
         isSocketReadingActive = true
 
@@ -104,10 +106,28 @@ class ChartLogic(private val dataRepository: DataRepository) {
         // (like from a DB, from sockets, etc.), but this is more advanced stuff
         // and nothing to worry about if you're just getting started with all the
         // architectural stuff.
-        val data = gson.fromJson(socketDataLine, TimeAxisEntity::class.java)
-//        axisX1Series.add(Millisecond(), data.accelX)
-//        axisY1Series.add(Millisecond(), data.accelY)
-//        axisZ1Series.add(Millisecond(), data.accelZ)
+
+        if (!isSocketFirstLineRead){
+            isSocketFirstLineRead = true
+            val timeAxesMetaData = gson.fromJson(socketDataLine, TimeAxisMeta::class.java)
+            initAxisMap(timeAxesMetaData)
+            return
+        }
+
+
+        val data = gson.fromJson(socketDataLine, DataLine::class.java)
+        val axisValues = data.value.axes
+        val time = data.value.timestamp
+        println(data)
+
+        axisValues.forEachIndexed { index, doubleVal ->
+            val millisecond = Millisecond(Date(time))
+            try {
+                axes[index].add(millisecond, doubleVal)
+            } catch (e: Exception) {
+                println("Duplicate time stamp... skipping [$e]")
+            }
+        }
     }
 
     private fun handleOnFileLoaded() {
@@ -115,6 +135,7 @@ class ChartLogic(private val dataRepository: DataRepository) {
 
         if (initChartLogicAndAxes()) return
 
+        isSocketFirstLineRead = false
         isSocketReadingActive = false
         isFileLoaded = true
     }
@@ -158,7 +179,6 @@ class ChartLogic(private val dataRepository: DataRepository) {
 
         // FEEDBACK:
         // 4. File reading logic belongs in a separate data related class such as the repository
-        var setTime = 0L
         coroutineScope.launch {
             while (scanner.hasNextLine() && isFileReadingActive) {
                 val line = scanner.nextLine()
@@ -167,11 +187,13 @@ class ChartLogic(private val dataRepository: DataRepository) {
                 val time = data.value.timestamp
                 println(data)
 
-                if (setTime != time) {
-                    setTime = time
-                    axisValues.forEachIndexed { index, doubleVal ->
-                        val millisecond = Millisecond(Date(time))
+                axisValues.forEachIndexed { index, doubleVal ->
+                    val millisecond = Millisecond(Date(time))
+
+                    try {
                         axes[index].add(millisecond, doubleVal)
+                    } catch (e: Exception) {
+                        println("Duplicate timestamp... skipping")
                     }
                 }
 
@@ -200,6 +222,7 @@ class ChartLogic(private val dataRepository: DataRepository) {
         coroutineScope = CoroutineScope(Dispatchers.IO)
         currentPlayingFile = null
         isFileLoaded = false
+        isSocketFirstLineRead = false
     }
 
     private fun createChart(): ChartPanel {
