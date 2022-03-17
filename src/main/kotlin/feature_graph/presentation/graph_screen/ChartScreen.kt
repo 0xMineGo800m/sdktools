@@ -5,7 +5,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.SwingPanel
@@ -60,9 +59,10 @@ fun ChartScreen(chartLogic: ChartLogic) {
 
             AxisSelector(
                 axes = chartLogic.axes,
-                axisVisibility = { name, visibility ->
-                    chartLogic.onEvent(ChartEvent.AxisVisibility(name, visibility))
-                }
+                axisVisibility = chartLogic.axesVisibility
+            ) { name, visibility ->
+                chartLogic.onEvent(ChartEvent.AxisVisibility(name, visibility))
+            }
 
 //                axisXVisibility = chartLogic.axisX1Visibility,
 //                axisYVisibility = chartLogic.axisY1Visibility,
@@ -70,7 +70,7 @@ fun ChartScreen(chartLogic: ChartLogic) {
 //                axisX1Action = { isChecked -> chartLogic.onEvent(ChartEvent.AxisVisibility("AxisX1", isChecked)) },
 //                axisY1Action = { isChecked -> chartLogic.onEvent(ChartEvent.AxisVisibility("AxisY1", isChecked)) },
 //                axisZ1Action = { isChecked -> chartLogic.onEvent(ChartEvent.AxisVisibility("AxisZ1", isChecked)) }
-            )
+
 
             TheChart(chartLogic.chartPanel)
         }
@@ -78,15 +78,15 @@ fun ChartScreen(chartLogic: ChartLogic) {
 }
 
 @Composable
-private fun AxisSelector(axes: SnapshotStateMap<TimeSeries, Boolean>, axisVisibility: AxisVisibility) {
-    val keys = axes.keys.toList()
-    val visibilities = axes.values.toList()
+private fun AxisSelector(axes: MutableList<TimeSeries>, axisVisibility: MutableList<Boolean>, axisVisibilityAction: AxisVisibility) {
+//    val keys = axes.keys.toList()
+//    val visibilities = axes.values.toList()
     Card(elevation = 5.dp, shape = RoundedCornerShape(0.dp)) {
         LazyColumn(modifier = Modifier.padding(8.dp).wrapContentWidth().fillMaxHeight()) {
             items(axes.size) { oneItem ->
 
-                LabelledCheckbox(keys[oneItem].key.toString(), visibilities[oneItem]) { isChecked ->
-                    axisVisibility.invoke(keys[oneItem].key.toString(), isChecked)
+                LabelledCheckbox(axes[oneItem].key.toString(), axisVisibility[oneItem]) { isChecked ->
+                    axisVisibilityAction.invoke(axes[oneItem].key.toString(), isChecked)
                 }
             }
         }

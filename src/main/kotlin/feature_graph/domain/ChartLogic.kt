@@ -34,7 +34,8 @@ class ChartLogic(private val dataRepository: DataRepository) {
     private var coroutineScope = CoroutineScope(Dispatchers.IO)
     private var jFreeChart: JFreeChart? = null
     private var currentPlayingFile: File? = null
-    val axes = mutableStateMapOf<TimeSeries, Boolean>()
+    val axes = mutableStateListOf<TimeSeries>()
+    val axesVisibility = mutableStateListOf<Boolean>()
     var isFileLoaded by mutableStateOf(false)
     var isFileReadingActive by mutableStateOf(false)
     var isSocketReadingActive by mutableStateOf(false)
@@ -84,7 +85,7 @@ class ChartLogic(private val dataRepository: DataRepository) {
         val timeSeriesCollection = jFreeChart?.xyPlot?.dataset as TimeSeriesCollection
         timeSeriesCollection.removeAllSeries()
 
-        axes.forEach { (t, _) ->
+        axes.forEach { t ->
             t.clear()
             timeSeriesCollection.addSeries(t)
         }
@@ -130,17 +131,16 @@ class ChartLogic(private val dataRepository: DataRepository) {
         val firstLine = scanner.nextLine()
         val timeAxesMetaData = gson.fromJson(firstLine, TimeAxisMeta::class.java)
         initAxisMap(timeAxesMetaData)
-//        initChart(timeAxesMetaData)
         fis.close()
         return false
     }
 
     private fun handleAxisVisibility(event: ChartEvent.AxisVisibility) {
         run loop@{
-            axes.keys.forEachIndexed { index, timeSeries ->
+            axes.forEachIndexed { index, timeSeries ->
                 if (timeSeries.key.toString() == event.axisName) {
                     jFreeChart?.xyPlot?.renderer?.setSeriesVisible(index, event.isVisible)
-//                    axes.computeIfPresent(timeSeries, event.isVisible)
+                    axesVisibility[index] = event.isVisible
                     return@loop
                 }
             }
@@ -169,9 +169,9 @@ class ChartLogic(private val dataRepository: DataRepository) {
                 println(data)
 
                 val iterator = axes.iterator()
-                axisValues.forEach { doubleVal ->
-                    val timeAXis = iterator.next().key
-                    timeAXis.add(Millisecond(), doubleVal)
+                axisValues.forEachIndexed { index, doubleVal ->
+//                    val timeAXis = iterator.next().key
+                    axes[index].add(Millisecond(), doubleVal)
                 }
 
                 delay(40)
@@ -184,8 +184,10 @@ class ChartLogic(private val dataRepository: DataRepository) {
 
     private fun initAxisMap(timeAxesMetaData: TimeAxisMeta?) {
         axes.clear()
+        axesVisibility.clear()
         timeAxesMetaData?.names?.forEach { name ->
-            axes[TimeSeries(name)] = true
+            axes.add(TimeSeries(name))
+            axesVisibility.add(true)
         }
 
         chartPanel = createChart()
@@ -199,30 +201,9 @@ class ChartLogic(private val dataRepository: DataRepository) {
         isFileLoaded = false
     }
 
-    private fun initChart(timeAxesMetaData: TimeAxisMeta) {
-        val dataset = TimeSeriesCollection()
-
-        timeAxesMetaData.names.forEach { axisName ->
-            val ts = TimeSeries(axisName).apply {
-                maximumItemCount = 200
-            }
-            axes[ts] = true
-            dataset.addSeries(ts)
-        }
-
-        val renderer = XYSplineRenderer()
-        for (index in 0..axes.size) {
-            renderer.setSeriesPaint(index, ui.theme.colorMap[index])
-            renderer.setSeriesShapesVisible(index, false)
-        }
-
-        jFreeChart?.xyPlot?.dataset = dataset
-        jFreeChart?.xyPlot?.renderer = renderer
-    }
-
     private fun createChart(): ChartPanel {
         val dataset = TimeSeriesCollection()
-        axes.forEach { (t, _) ->
+        axes.forEach { t ->
             t.maximumItemCount = 200
             dataset.addSeries(t)
         }
