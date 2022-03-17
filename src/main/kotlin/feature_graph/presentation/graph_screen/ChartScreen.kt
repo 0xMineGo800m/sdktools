@@ -56,21 +56,12 @@ fun ChartScreen(chartLogic: ChartLogic) {
         Spacer(Modifier.height(10.dp))
 
         Row(modifier = Modifier.padding(5.dp), Arrangement.spacedBy(5.dp)) {
-
             AxisSelector(
                 axes = chartLogic.axes,
                 axisVisibility = chartLogic.axesVisibility
             ) { name, visibility ->
                 chartLogic.onEvent(ChartEvent.AxisVisibility(name, visibility))
             }
-
-//                axisXVisibility = chartLogic.axisX1Visibility,
-//                axisYVisibility = chartLogic.axisY1Visibility,
-//                axisZ1Visibility = chartLogic.axisZ1Visibility,
-//                axisX1Action = { isChecked -> chartLogic.onEvent(ChartEvent.AxisVisibility("AxisX1", isChecked)) },
-//                axisY1Action = { isChecked -> chartLogic.onEvent(ChartEvent.AxisVisibility("AxisY1", isChecked)) },
-//                axisZ1Action = { isChecked -> chartLogic.onEvent(ChartEvent.AxisVisibility("AxisZ1", isChecked)) }
-
 
             TheChart(chartLogic.chartPanel)
         }

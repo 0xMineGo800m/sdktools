@@ -14,9 +14,7 @@ import org.jfree.chart.axis.NumberAxis
 import org.jfree.chart.plot.XYPlot
 import org.jfree.chart.renderer.xy.XYSplineRenderer
 import org.jfree.data.Range
-import org.jfree.data.time.Millisecond
-import org.jfree.data.time.TimeSeries
-import org.jfree.data.time.TimeSeriesCollection
+import org.jfree.data.time.*
 import java.io.File
 import java.io.FileInputStream
 import java.util.*
@@ -160,6 +158,7 @@ class ChartLogic(private val dataRepository: DataRepository) {
 
         // FEEDBACK:
         // 4. File reading logic belongs in a separate data related class such as the repository
+        var setTime = 0L
         coroutineScope.launch {
             while (scanner.hasNextLine() && isFileReadingActive) {
                 val line = scanner.nextLine()
@@ -168,10 +167,12 @@ class ChartLogic(private val dataRepository: DataRepository) {
                 val time = data.value.timestamp
                 println(data)
 
-                val iterator = axes.iterator()
-                axisValues.forEachIndexed { index, doubleVal ->
-//                    val timeAXis = iterator.next().key
-                    axes[index].add(Millisecond(), doubleVal)
+                if (setTime != time) {
+                    setTime = time
+                    axisValues.forEachIndexed { index, doubleVal ->
+                        val millisecond = Millisecond(Date(time))
+                        axes[index].add(millisecond, doubleVal)
+                    }
                 }
 
                 delay(40)
